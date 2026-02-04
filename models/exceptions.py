@@ -1,0 +1,3 @@
+
+class InvalidInstrumentCodeError(Exception):
+    pass
