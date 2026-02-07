@@ -45,3 +45,5 @@ class MoexTable(TypedDict):
 class MoexResponse(TypedDict, total=False):
     securities: MoexTable
     candles: MoexTable
+
+# Screner Models

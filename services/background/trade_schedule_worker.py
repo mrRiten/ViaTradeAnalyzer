@@ -1,43 +1,79 @@
 import asyncio
 import pandas as pd
-from models.trade_entity import INSTRUMENT_TIMEFRAME, InstumentType
-from services.api.trade_api_facade import TradeApiFacade
+from datetime import timedelta
+from typing import Dict
+from models.trade_entity import InstumentType, INSTRUMENT_TIMEFRAME
 from intarfaces.iinstrument_source import InstrumentSourceProtocol
-from services.trade_service.csv_repository import CsvRepository
+from services.background.exchange_client_manager import ExchangeClientManager
+from services.csv.csv_data_service import CsvDataService
 
 
 class TradeScheduleWorker:
-    def __init__(self, facade: TradeApiFacade, repo: CsvRepository, source: InstrumentSourceProtocol):
-        self.facade = facade
-        self.repo = repo
+    def __init__(
+        self,
+        csv_service: CsvDataService,
+        source: InstrumentSourceProtocol,
+        client_manager: ExchangeClientManager,
+        max_parallel: int = 5
+    ):
+        self.csv_service = csv_service
         self.source = source
-        self._semaphore = asyncio.Semaphore(5)  # max 5 parallel requests
+        self.client_manager = client_manager
+        self._semaphore = asyncio.Semaphore(max_parallel)
 
-    async def _process_ticker(self, instrument_type: InstumentType, ticker: str, timeframe):
+    async def _process(
+        self,
+        instrument_type: InstumentType,
+        ticker: str,
+        timeframe
+    ):
         async with self._semaphore:
-            df: pd.DataFrame = await self.facade.get_candles(
-                instrument_type, ticker, timeframe, None, None
-            )
-            if df.empty:
-                return
-            print(f"saving {ticker}")
+            folder = f"data/{instrument_type.name.lower()}"
+            client = self.client_manager.get_client(instrument_type)
 
-            self.repo.save(
-                df,
+            last_date = self.csv_service.get_last_date(
                 ticker,
                 timeframe.name,
-                df.begin.min().strftime("%Y-%m-%d"),
-                df.begin.max().strftime("%Y-%m-%d"),
-                f"data/{instrument_type.name.lower()}"
+                folder
             )
 
+            from_date = (
+                (pd.to_datetime(last_date) + timedelta(days=1)).strftime("%Y-%m-%d")
+                if last_date else None
+            )
+
+            new_df = await client.get_candles(
+                ticker,
+                timeframe,
+                from_date
+            )
+
+            self.csv_service.append_and_trim(
+                ticker,
+                timeframe.name,
+                folder,
+                new_df
+            )
+
+    async def _get_instruments(self) -> Dict[InstumentType, list[str]]:
+        try:
+            instruments = await self.client_manager.get_all_instruments_from_db(self.source)
+            if instruments:
+                return instruments
+        except Exception:
+            pass
+
+        return self.csv_service.get_all_instruments_from_files()
+
     async def __call__(self):
-        instruments = await self.source.get_instruments()
+        instruments = await self._get_instruments()
 
         tasks = []
         for instrument_type, tickers in instruments.items():
             timeframe = INSTRUMENT_TIMEFRAME[instrument_type]
             for ticker in tickers:
-                tasks.append(self._process_ticker(instrument_type, ticker, timeframe))
+                tasks.append(
+                    self._process(instrument_type, ticker, timeframe)
+                )
 
         await asyncio.gather(*tasks)

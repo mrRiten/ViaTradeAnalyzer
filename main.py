@@ -1,32 +1,36 @@
 import asyncio
 from services.api.http_client_service import HttpClientService
-from services.api.trade_api_facade import TradeApiFacade
 from services.api.asp_instrument_service import AspInstrumentSource
+from services.background.exchange_client_manager import ExchangeClientManager
 from services.background.trade_schedule_worker import TradeScheduleWorker
-from services.trade_service.csv_repository import CsvRepository
-from services.moex.futures_service import FuturesClient
-from services.moex.stocks_service import StocksClient
-from models.trade_entity import InstumentType
+from services.csv.csv_data_repository import CsvDataRepository
+from services.csv.csv_data_service import CsvDataService
+
+
 
 async def main():
     http = HttpClientService(timeout=60)
 
-    clients = {
-        InstumentType.FUTURES: FuturesClient(session_factory=http.create),
-        InstumentType.STOCKS: StocksClient(session_factory=http.create)
-    }
+    source = AspInstrumentSource(
+        http=http,
+        base_url="test"
+    )
 
-    facade = TradeApiFacade(clients=clients)
-    repo = CsvRepository()
+    client_manager = ExchangeClientManager(
+        session_factory=http.create
+    )
 
-    source = AspInstrumentSource(http=http, base_url="test")
+    repo = CsvDataRepository()
+    csv_service = CsvDataService(repo)
 
     worker = TradeScheduleWorker(
-        facade=facade,
-        repo=repo,
-        source=source
+        csv_service=csv_service,
+        source=source,
+        client_manager=client_manager
     )
 
     await worker()
 
-asyncio.run(main())
+
+if __name__ == "__main__":
+    asyncio.run(main())
