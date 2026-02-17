@@ -32,5 +32,5 @@ class AspInstrumentSource:
     ) -> dict[InstumentType, list[str]]:
         return {
             InstumentType.STOCKS: ["GAZP", "MOEX", "T", "YDEX", "GMKN"],
-            InstumentType.FUTURES: ["MMH5", "RBH6", "TBH6", "GKH6", "LKH6"],
+            InstumentType.FUTURES: ["MMH6", "MEH6", "RBH6", "TBH6", "GKH6", "LKH6"],
         }

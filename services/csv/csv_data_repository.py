@@ -94,4 +94,7 @@ class CsvDataRepository:
             f.unlink()
 
         path = path_dir / f"{ticker}_{interval}_{from_date}_{till_date}.csv"
+
+        print(f"save to {path}")
+
         df.to_csv(path, index=False)
