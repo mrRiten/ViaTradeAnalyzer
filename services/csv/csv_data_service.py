@@ -79,5 +79,6 @@ class CsvDataService:
             df,
             ticker,
             interval,
-            folder
+            folder,
+            None
         )

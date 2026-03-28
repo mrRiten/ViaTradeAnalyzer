@@ -80,8 +80,12 @@ class CsvDataRepository:
         df: pd.DataFrame,
         ticker: str,
         interval: str,
-        folder: str
+        folder: str,
+        additional: str | None,
     ) -> None:
+        if not additional:
+            additional = ""
+
         df = df.sort_values("begin").tail(self.MAX_ROWS)
 
         from_date = df.begin.min().strftime("%Y-%m-%d")
@@ -93,7 +97,7 @@ class CsvDataRepository:
         for f in path_dir.glob(f"{ticker}_{interval}_*.csv"):
             f.unlink()
 
-        path = path_dir / f"{ticker}_{interval}_{from_date}_{till_date}.csv"
+        path = path_dir / f"{ticker}_{interval}_{from_date}_{till_date}_{additional}.csv"
 
         print(f"save to {path}")
 

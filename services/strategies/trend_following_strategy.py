@@ -35,7 +35,8 @@ class TrendFollowingStrategy(BaseTradeStrategy):
             screnner_df,
             ticker,
             interval.name,
-            screnner_folder
+            screnner_folder,
+            __class__.__name__
         )
 
         # Индикаторы
@@ -106,11 +107,13 @@ class TrendFollowingStrategy(BaseTradeStrategy):
 
         # Сохраняем минималистично для стратегии
         strategy_folder = "data/result/strategy"
+        test: str = __class__.__name__
         self.data_repository.overwrite(
             strategy_df,
             ticker,
             interval.name,
-            strategy_folder
+            strategy_folder,
+            test
         )
 
         return strategy_df
