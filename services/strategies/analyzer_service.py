@@ -4,7 +4,6 @@ from models.trade_entity import INSTRUMENT_TIMEFRAME, InstumentType
 from services.csv.csv_data_service import CsvDataService
 from services.strategies.base_trade_strategy import BaseTradeStrategy
 
-
 class AnalyzerService:
     def __init__(
         self,

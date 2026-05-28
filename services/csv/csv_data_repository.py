@@ -7,12 +7,12 @@ from typing import Optional
 class CsvDataRepository:
     MAX_ROWS = 800
 
-    def _find_file(self, ticker: str, interval: str, folder: str) -> Optional[Path]:
+    def _find_file(self, ticker: str, interval: str, folder: str, addtional_target: str = "") -> Optional[Path]:
         path_dir = Path(folder)
         if not path_dir.exists():
             return None
 
-        files = list(path_dir.glob(f"{ticker}_{interval}_*.csv"))
+        files = list(path_dir.glob(f"{ticker}_{interval}_{addtional_target}*.csv"))
         if not files:
             return None
 
