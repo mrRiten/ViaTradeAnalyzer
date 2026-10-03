@@ -1,77 +1,34 @@
 # Technical Stack
 
-This file describes important runtime and development dependencies.
+Exact resolved versions below come from `uv.lock`; direct dependency constraints come from `pyproject.toml`.
 
-Exact versions must be synchronized with `pyproject.toml` and `uv.lock`.
+## Runtime and Dependency Management
 
-Do not guess versions.
+- Python 3.13 (`requires-python = ">=3.13"`; `.python-version` selects `3.13`)
+- uv with `pyproject.toml` and `uv.lock`
 
-## Runtime
+## Direct Runtime Dependencies
 
-- Language: Python
-- Target version: Python 3.13
+- `aiohttp` 3.13.3 — asynchronous MOEX HTTP sessions and requests.
+- `APScheduler` 3.11.2 — optional asynchronous scheduling infrastructure; not wired into the current entry point.
+- `pandas` 2.3.3 — candle frames, CSV processing, indicators, and signal calculations.
+- `pandas-ta` 0.4.71b0 — declared direct dependency, currently unused by source code.
+- `requests` 2.32.5 — declared direct dependency, currently unused by source code.
 
-## Dependency Management
+## External Systems and Storage
 
-- Package/project manager: uv
-- Direct dependency configuration: `pyproject.toml`
-- Resolved dependency versions: `uv.lock`
+- MOEX ISS public HTTP API — stock and futures candle source.
+- Optional ASP/backend instrument endpoint — implementation is present only as commented code; the active source is hardcoded.
+- CSV filesystem storage under `data/` — both market history and generated analysis results.
 
-`uv.lock` is authoritative for resolved package versions.
+There is no database, cache/queue service, messaging framework, or executable-packaging configuration in the current project.
 
-## Telegram
+## Testing and Packaging
 
-- Telegram bot framework: aiogram 3.31.0
-- Proxy session: aiogram aiohttp session with database-selected proxies
-
-## Database
-
-- Database: Microsoft SQL Server
-- ORM/database layer: SQLAlchemy 2.0.52
-- ODBC driver: pyodbc 5.3.0
-- Connection configuration: `MSSQL_CONNECTION_STRING`
-
-## Cache / Queue
-
-- Infrastructure: Redis
-- Redis client/library: redis-py 8.1.0 (`redis.asyncio`)
-
-## Packaging
-
-- Packaging tool: PyInstaller 6.22.2
-- Configuration: `main.spec`
-
-## Testing
-
-- Automated test framework: not declared in project dependencies
-
-## Important Dependencies
-
-Maintain only dependencies that affect architecture or development decisions.
-
-Format:
-
-| Dependency | Version | Purpose |
-|---|---|---|
-| Python | 3.13 | Runtime |
-| aiogram | 3.31.0 | Telegram Bot API integration |
-| SQLAlchemy | 2.0.52 | ORM and database access |
-| pyodbc | 5.3.0 | MSSQL ODBC connectivity |
-| redis | 8.1.0 | Asynchronous Redis queue integration |
-| pydantic-settings | 2.15.0 | Environment-based settings |
-| aiohttp-socks | 0.12.0 | SOCKS proxy support |
-| PyInstaller | 6.22.2 | Windows executable packaging |
-
-Do not copy the complete dependency lock into this file.
+- No automated test framework is declared.
+- No `tests/` directory is present.
+- No executable-packaging specification is present.
 
 ## Maintenance
 
-Update this file when:
-
-- Python target changes;
-- an architectural dependency is added or removed;
-- a major dependency version changes;
-- database/cache infrastructure changes;
-- packaging tooling changes.
-
-Patch-level transitive dependency changes do not require a HISTORY entry unless they affect application behavior.
+Update this file when the Python target, a direct architectural dependency, external integration, storage model, or runtime mode changes. Do not copy the full lock file here.

@@ -2,30 +2,52 @@
 
 ## Root
 
-- `src/main.py` — application composition, router registration, lifecycle hooks, and background-worker startup.
-- `src/config.py` — Pydantic settings loaded from environment configuration.
-- `src/proxy_module.py` — Telegram session creation and active-proxy lookup from MSSQL.
-- `src/logging_config.py` — application logging setup.
-- `pyproject.toml` and `uv.lock` — dependency declarations and resolved versions.
-- `main.spec` — PyInstaller packaging configuration.
-- `test_db.py` — manual database/bot utility; it is not an automated test.
+- `src/main.py` — application entry point and one-shot composition of market-data loading and analysis.
+- `pyproject.toml` — project metadata, Python constraint, and direct dependencies.
+- `uv.lock` — resolved dependency versions.
+- `.python-version` — local Python version selection.
+- `README.md` — currently empty; do not rely on it for architecture.
+- `data/` — tracked runtime CSV inputs and generated analysis outputs.
+
+There is currently no automated `tests/` suite and no packaging specification.
 
 ## Application Source
 
-- `src/bot/handlers/` — aiogram routers for commands, menu actions, tickets, attendance, SLA, employee search, and help.
-- `src/bot/builders/` — Telegram message formatting only.
-- `src/bot/keyboards/` — inline and reply keyboard construction.
-- `src/bot/middlewares/` — Telegram-user binding and access checks.
-- `src/bot/commands/` — Telegram command registration.
-- `src/bot/redis/` — Redis client, queue message model, and queue operations.
-- `src/bot/workers/` — asynchronous queued Telegram delivery and sender configuration.
+- `src/models/system.py` — typed shape of an instruments response.
+- `src/models/trade_entity.py` — candle, signal, instrument-type, timeframe, and MOEX response models.
+- `src/models/exceptions.py` — project exception definitions.
 
-- `src/application/services/` — business operations for tickets, attendance, bot start, SLA, and no-response-required records.
-- `src/application/repositories/` — synchronous SQLAlchemy access to HelpDesk tables, including Telegram-binding role catalog and assignment access.
-- `src/application/jobs/` — scheduled SLA, SLA-delivery, and no-response-required report checks.
-- `src/application/client/` — external calendar client used by SLA checks.
-- `src/application/utils/sla/` — working-hours calculation.
+- `src/intarfaces/` — protocols and abstract interfaces for instrument sources, exchange clients, CSV repositories, background tasks, and screeners. The directory name is intentionally documented with its current spelling.
 
-- `src/core/db/` — SQLAlchemy Core table definitions for existing MSSQL tables, including Telegram-binding roles and assignments.
-- `src/core/dto/` — dataclasses used between repositories, services, and builders, including role catalog values.
-- `src/core/constants.py` — reusable static display text and formats.
+- `src/services/api/http_client_service.py` — configured `aiohttp.ClientSession` factory.
+- `src/services/api/asp_instrument_service.py` — instrument source; currently returns a hardcoded stock list while the HTTP implementation is commented out.
+- `src/services/api/asp_notify_service.py` — notification stub with no implemented delivery.
+
+- `src/services/moex/base_moex_client.py` — shared MOEX ISS candle pagination, retries, normalization, and record limits.
+- `src/services/moex/stocks_service.py` — MOEX shares-market client.
+- `src/services/moex/futures_service.py` — MOEX FORTS futures-market client.
+
+- `src/services/background/exchange_client_manager.py` — maps instrument types to exchange clients.
+- `src/services/background/trade_schedule_worker.py` — obtains instruments, loads candles concurrently, and updates CSV storage.
+- `src/services/background/background_service.py` — APScheduler-compatible wrapper for an asynchronous task.
+- `src/services/background/service_manager.py` — scheduler and registered-service coordinator; not used by the current entry point.
+
+- `src/services/csv/csv_data_repository.py` — locates, reads, overwrites, and trims candle/result CSV files.
+- `src/services/csv/csv_data_service.py` — CSV update orchestration and instrument discovery from stored files.
+- `src/services/csv/csv_result_repository.py` — empty placeholder.
+- `src/services/csv/csv_result_service.py` — empty placeholder.
+
+- `src/services/strategies/analyzer_service.py` — runs configured strategies for instruments found in CSV storage.
+- `src/services/strategies/base_trade_strategy.py` — strategy abstraction.
+- `src/services/strategies/trend_following_strategy.py` — EMA/RSI trend and crossing signals.
+- `src/services/strategies/rsi_strategy.py` — RSI overbought/oversold signals.
+- `src/services/strategies/Screnners/deep_ema_rsi_screnner.py` — EMA 20/50/200 and RSI 14 calculation. The current directory and class/method spellings are part of the existing code.
+
+## Data Layout
+
+- `data/stocks/` — stock candle CSV files.
+- `data/futures/` — futures candle CSV files.
+- `data/result/screnner/` — indicator-enriched strategy inputs.
+- `data/result/strategy/` — final strategy signal CSV files.
+
+Treat files under `data/` as runtime/generated artifacts even though they are currently tracked.

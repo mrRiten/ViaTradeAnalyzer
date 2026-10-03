@@ -1,110 +1,47 @@
 # Forbidden Paths and Actions
 
-## Secret Files
+## Secrets and Security
 
-Do not inspect, print, copy, summarize, or commit secret values from:
+Do not inspect, print, copy, summarize, or commit values from `.env`, `.env.*`, credential files, private keys, or token files.
 
-- `.env`
-- `.env.*`
-- credential files
-- private keys
-- token files
+Never hardcode credentials or disable TLS certificate verification to bypass connection errors.
 
-Configuration variable names may be referenced when necessary.
-Secret values must not be exposed.
+## Dependencies and Generated Files
 
-## Dependency Environments
+Do not recursively inspect or modify `.venv/`, `venv/`, dependency source, caches, `__pycache__/`, `.pytest_cache/`, `.mypy_cache/`, or `.ruff_cache/`.
 
-Do not recursively inspect:
+Do not inspect or modify `.git/` internals during normal work. Use Git commands when history or repository state is relevant.
 
-- `.venv/`
-- `venv/`
-
-Installed dependency source code is not part of the application.
-
-Do not modify files inside virtual environments.
-
-## Generated Files
-
-Do not treat the following as source:
-
-- `logs/`
-- `output/`
-- `__pycache__/`
-- `.pytest_cache/`
-- `.mypy_cache/`
-- `.ruff_cache/`
-- PyInstaller build output
-- generated executables
-
-Do not modify generated artifacts to implement application behavior.
-
-## Repository Internals
-
-Do not inspect or modify `.git/` internals during normal development tasks.
-
-Git history may be inspected through Git commands when historical context is explicitly required.
-
-## Security
-
-Never:
-
-- commit credentials;
-- hardcode bot tokens;
-- hardcode database credentials;
-- expose connection strings;
-- expose Redis credentials;
-- expose proxy credentials;
-- disable TLS certificate verification to bypass connection errors.
+`data/` contains tracked runtime/generated CSV artifacts. Do not edit these files manually unless the task explicitly targets data. Fix producing logic under `src/` rather than patching generated results.
 
 ## Architecture
 
-Do not place SQL/database access directly in Telegram handlers.
+Preserve the existing responsibility flow:
 
-Do not place substantial business logic directly in Telegram handlers.
+`instrument API/source and MOEX clients -> trade worker -> CSV storage -> analyzers and strategies`
 
-Do not turn builders into business-logic services.
+Keep HTTP/exchange access in API or MOEX services, orchestration in the worker/analyzer services, persistence in CSV services/repositories, and indicator/signal rules in screeners/strategies.
 
-Do not duplicate static Russian user-facing strings in builders when they belong in shared constants.
+Do not introduce new architectural layers or dependencies without a concrete requirement.
 
-Do not introduce new architectural layers without a concrete requirement.
+## Exploration and Changes
 
-## Exploration
+Do not recursively scan the repository by default. Start from HARNESS and inspect targeted source paths.
 
-Do not recursively scan the whole repository by default.
+Do not perform unrelated refactoring, silently change behavior outside the task scope, or rename existing misspelled paths and APIs (`intarfaces`, `Screnners`, `screnne`, `InstumentType`) incidentally.
 
-Start from HARNESS and inspect targeted source paths.
-
-Do not read unrelated files merely to increase context.
-
-Do not inspect generated directories or dependency environments while searching for application code.
-
-## Changes
-
-Do not perform unrelated refactoring during a focused task.
-
-Do not silently change public behavior outside the task scope.
-
-Do not change dependency versions unless required by the task.
-
-Do not change database schema implicitly.
-
-Do not modify `main.spec` unless packaging behavior is relevant.
+Do not change dependency versions unless the task requires it.
 
 ## Validation
+
+Do not run `src/main.py` as a routine validation command. It performs network requests and can overwrite tracked CSV files under `data/`.
+
+Prefer side-effect-free checks such as `python -m compileall src` and focused tests when available.
 
 Do not report a command, test, build, or validation as successful unless it was actually executed successfully.
 
 ## HARNESS
 
-Never store secrets in HARNESS.
+Never store secrets, raw logs, raw diffs, complete source files, temporary debugging notes, or speculative conclusions in HARNESS.
 
-Do not store:
-
-- raw logs;
-- raw diffs;
-- complete source files;
-- temporary debugging notes;
-- speculative conclusions.
-
-HARNESS must contain durable project knowledge only.
+HARNESS must contain compact, durable project knowledge only.

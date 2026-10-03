@@ -123,3 +123,7 @@ Priority when information conflicts:
 4. previous agent summaries.
 
 Agents should correct stale HARNESS information when discovered during a task.
+
+## Safe Validation
+
+The current entry point performs network requests and writes CSV artifacts under `data/`. Do not run `src/main.py` as a routine documentation or static-validation check. Prefer side-effect-free compilation and focused tests.

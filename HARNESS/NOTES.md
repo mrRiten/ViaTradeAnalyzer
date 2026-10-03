@@ -1,103 +1,51 @@
 # Project Notes
 
-## Runtime and Composition
+## Runtime Flow
 
-`src/main.py` composes the aiogram bot, Redis message service, middleware, routers, and background workers. Startup starts queued Telegram delivery plus SLA, SLA-delivery, and no-response-required report workers; shutdown stops them and closes bot and Redis sessions.
+`src/main.py` builds an HTTP session factory, instrument source, exchange-client manager, CSV repository/service, and `TradeScheduleWorker`. After candle synchronization finishes, it constructs `DeepEmaRsiScrenner`, `TrendFollowingStrategy`, and `RsiStrategy`, then runs `AnalyzerService`.
 
-Normal local startup requires valid bot configuration, MSSQL connectivity, and Redis availability.
+The current entry point is a one-shot `asyncio.run` pipeline. `BackgroundService` and `ServiceManager` provide APScheduler integration but are not wired into `main.py`.
 
-## Architecture
+Running the entry point has external and filesystem side effects: it calls MOEX over HTTP and may replace tracked CSV files in `data/`.
 
-Expected application dependency flow:
+## Instrument and Candle Loading
 
-`Telegram handler -> service -> repository -> database`
+`AspInstrumentSource` currently returns a hardcoded list of stocks. Its backend HTTP implementation is commented out. Futures are supported by the models and exchange-client manager, but the active source does not return them.
 
-Telegram handlers should stay thin.
+If the instrument source fails or returns no data, `TradeScheduleWorker` reconstructs instrument lists from CSV filenames under `data/stocks/` and `data/futures/`.
 
-Services own business rules and orchestration.
+The worker selects a client by `InstumentType`, limits concurrent ticker processing with a semaphore, and uses these fixed mappings:
 
-Repositories own database access.
+- stocks -> `TimeFrame.DAY` with MOEX interval `24`;
+- futures -> `TimeFrame.HOUR_1` with MOEX interval `60`.
 
-DTOs define data exchanged between layers where applicable.
+`StocksClient` uses the MOEX shares endpoint. `FuturesClient` uses the MOEX FORTS endpoint.
 
-Builders are responsible for presentation formatting.
+`BaseMoexClient` returns at most 1,000 normalized candles, sizes each date window for a nominal maximum of 500 candles, and retries failed HTTP calls three times. `CsvDataRepository` retains the latest 800 rows when writing.
 
-Keyboards are responsible for Telegram controls.
+## Analysis and Output
 
-Workers handle asynchronous/queued delivery where applicable.
+`AnalyzerService` discovers instruments from stored CSV files and runs every configured strategy for each ticker.
 
-`MessageSenderService` is the service-layer boundary for queued Telegram sends. It places `QueueMessage` values on Redis; `TelegramSenderWorker` consumes them, handles retryable Telegram failures, and moves unrecoverable messages to the dead-letter queue.
+`DeepEmaRsiScrenner` calculates EMA 20, EMA 50, EMA 200, and RSI 14. `TrendFollowingStrategy` combines EMA crossings, EMA direction, price relative to EMA 200, and RSI. `RsiStrategy` emits Buy below RSI 30 and Sell above RSI 70.
 
-## User-facing Messages
+Indicator-enriched frames are written to `data/result/screnner/`; signal frames are written to `data/result/strategy/`. The strategy class name is used as the result identifier.
 
-Telegram messages may use HTML formatting.
+`AspNotifyService`, `csv_result_repository.py`, and `csv_result_service.py` are placeholders and currently contain no functional result-delivery path.
 
-Dynamic values inserted into HTML messages must be escaped.
+## Known Risks
 
-Reusable static Russian display text belongs in:
+- `TradeScheduleWorker` computes the stored last date plus one day and passes it as the third `get_candles` argument. `BaseMoexClient` interprets that argument as the upper `till` date, so incremental updates may query the wrong date range.
+- Base candle writes currently produce filenames with a trailing underscore before `.csv`, while cleanup without an additional identifier deletes only names whose stem has exactly four underscore-separated parts. Older files can remain alongside new ones.
+- `_find_file` chooses a match by the final underscore-separated stem token. For trailing-underscore base filenames that token is empty, so selection of the newest dated file is unreliable.
+- Runtime CSV artifacts are tracked in Git, making ordinary pipeline runs capable of producing large working-tree changes.
 
-`src/core/constants.py`
+These are documented implementation risks, not instructions to modify data files. Verify and fix source logic in a dedicated task.
 
-Avoid scattering identical display strings across builders and handlers.
+## Naming Compatibility
 
-## Employee Search
+The current code uses the spellings `intarfaces`, `Screnners`, `screnne`, and `InstumentType`. Preserve them in focused changes unless a coordinated rename is explicitly requested.
 
-The `/employ` command uses an FSM prompt to look up an employee by an exact NEON number or by exactly two name parts. `UserQueryService` delegates to `UserRepository`, which returns only records with non-empty first and last names. Name lookups return at most two results so the handler can require a more specific query when a name is ambiguous.
+## Testing
 
-## Database and Proxies
-
-The project uses MSSQL.
-
-Connection configuration is provided through environment configuration.
-
-Repository code should isolate database operations from Telegram-specific code.
-
-Database schema changes must be considered separately from ordinary application-code changes.
-
-Telegram-binding authorization roles are stored in the `tg_binding_roles` catalog and linked to bindings through `tg_binding_role_assignments`. `TgBindingRoleRepository` reads active roles and manages assignment activation/deactivation; role lookups exclude inactive bindings, assignments, and catalog roles.
-
-At session creation, the bot selects the first active proxy from the MSSQL `proxies` table. The session does not rotate proxies at runtime; proxy settings are database-managed rather than read directly from `PROXY_URL`.
-
-## Redis
-
-Redis is runtime infrastructure used by the bot for asynchronous Telegram delivery. The active queue and dead-letter queue are maintained by `RedisMessageService`.
-
-When investigating queued/asynchronous message behavior, inspect the relevant bot worker and Redis integration before changing service logic.
-
-Do not assume every Redis-related issue belongs to the business-service layer.
-
-## SLA and Scheduled Work
-
-`SLAChecker` obtains candidate tasks from the service layer, fetches working-day data from `isdayoff.ru`, caches the requested date range, and sends developer and escalation notifications through the message queue. `SLARepository` assigns each developer an SLA group from active Telegram-binding roles with priority `manager`, then `analyst`, then `developer`. Critical and director escalations select and de-duplicate lead recipients by those groups through `MANAGER_LEAD_IDS`, `ANALYTICS_LEAD_IDS`, and `TECH_LEAD_IDS`. Its schedule is controlled by the SLA settings in `src/config.py`.
-
-The delivery checker reports failed SLA notifications on its configured daily schedule. The no-response-required worker sends its report on the configured weekday and time.
-
-## Tests
-
-There is no `tests/` directory at present. Add focused pytest tests for isolated new business rules where practical. `test_db.py` is a manual utility, not an automated pytest test, and must never contain active credentials.
-
-## Packaging
-
-Windows executable packaging uses:
-
-`main.spec`
-
-Packaging changes should be made only when application entry paths, bundled resources, imports, or packaging requirements change.
-
-Validate normal Python execution before diagnosing PyInstaller-specific behavior.
-
-## Development Principle
-
-Prefer existing project patterns.
-
-Avoid speculative abstractions.
-
-When behavior crosses multiple layers, trace the complete path before editing:
-
-`handler -> service -> repository -> database`
-
-or:
-
-`handler -> service -> builder -> Telegram response`
-
-depending on the task.
+There is currently no `tests/` directory or declared test framework. Add focused tests under `tests/` when changing isolated behavior where practical.
